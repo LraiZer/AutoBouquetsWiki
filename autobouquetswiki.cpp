@@ -926,7 +926,7 @@ int main (int argc, char *argv[]) {
 	si_close(fd);
 
 	// output CSV (comma separated values) to console,
-	// instead of creating creating html wiki web pages.
+	// instead of creating html wiki web pages.
 	if (console_csv)
 	{
 		for( unsigned short i = filter_bat_lower; i <= filter_bat_upper; i++ )
@@ -1153,7 +1153,7 @@ int main (int argc, char *argv[]) {
 #if 0
 					int pch = system(pcmd);
 
-				/* dont add img link if icon fail, but this does not
+				/* don't add img link if icon fail, but this does not
 				link to successful downloads of a similar icon name */
 				if (pch == 0)
 				{
@@ -1362,7 +1362,7 @@ int main (int argc, char *argv[]) {
 	st_js << sorttable_js;
 	st_js.close();
 
-	cout << endl << "www.ukcvs.net thanks you for using AutoBouqeutsWiki " << __DATE__ << ", have fun!" << endl << endl; 
+	cout << endl << "www.ukcvs.net thank you for using AutoBouqeutsWiki " << __DATE__ << ", have fun!" << endl << endl; 
 
 	return 0;
 }
