@@ -161,6 +161,51 @@ string ICON_NAME(const char * s) {
 	return r;
 }
 
+string CATEGORY_ID(unsigned short *s4, unsigned short *s5)
+{
+	switch (*s4)
+	{
+		case 0x10: return "Sky Info";
+		case 0x30: return "Shopping";
+		case 0x50: return "Kids";
+		case 0x70: return "Entertainment";
+		case 0x90: return "Radio";
+		case 0xB0: return "News";
+		case 0xD0: return "Movies";
+		case 0xF0: return "Sports";
+
+		case 0x00: return "Sky Help";
+		case 0x20: return "Unknown (0x20)";
+		case 0x40: return "Unknown (0x40)";
+		case 0x60: return "Unknown (0x60)";
+		case 0x80: return "Unknown (0x80)";
+		case 0xA0: return "Unknown (0xA0)";
+		case 0xC0: return "Unknown (0xC0)";
+		case 0xE0: return "Sports Pub";
+	}
+	switch (*s5)
+	{
+		case 0x1F: return "Lifestyle and Culture";
+		case 0x3F: return "Adult";
+		case 0x5F: return "Gaming and Dating";
+		case 0x7F: return "Documentaries";
+		case 0x9F: return "Music";
+		case 0xBF: return "Religion";
+		case 0xDF: return "International";
+		case 0xFF: return "Specialist";
+
+		case 0x0F: return "Unknown (0x0F)";
+		case 0x2F: return "Unknown (0x2F)";
+		case 0x4F: return "Unknown (0x4F)";
+		case 0x6F: return "Unknown (0x6F)";
+		case 0x8F: return "Unknown (0x8F)";
+		case 0xAF: return "Unknown (0xAF)";
+		case 0xCF: return "Unknown (0xCF)";
+		case 0xEF: return "Unknown (0xEF)";
+	}
+	return "Other";
+}
+
 const string currentDateTime() {
     time_t     now = time(0);
     struct tm  tstruct;
@@ -203,6 +248,7 @@ struct transport_t {
 
 struct service_t {
 	string name;
+	string category;
 	unsigned short channelid;
 	unsigned short tsid;
 	short type;
@@ -409,6 +455,7 @@ void si_parse_sdt(unsigned char *data, int length) {
 		char service_name[256];
 		char provider_name[256];
 		unsigned short service_type = 0;
+		string category = "Unassigned";
 		memset(service_name, '\0', 256);
 		memset(provider_name, '\0', 256);
 
@@ -445,6 +492,15 @@ void si_parse_sdt(unsigned char *data, int length) {
 				memset(service_name, '\0', 256);
 				memcpy(service_name, data + offset2 + 2, size);
 			}
+			if (tag == 0xb2)
+			{
+				if (size > 5)
+				{
+					unsigned short cat_0 = data[offset2 + 4];
+					unsigned short cat_F = data[offset2 + 5];
+					category = CATEGORY_ID(&cat_0, &cat_F);
+				}
+			}
 
 			descriptors_loop_length -= (size + 2);
 			offset2 += (size + 2);
@@ -469,6 +525,7 @@ void si_parse_sdt(unsigned char *data, int length) {
 		SDT[service_id].ca = free_ca;
 		SDT[service_id].type = service_type;
 		SDT[service_id].tsid = transport_stream_id;
+		SDT[service_id].category = category;
 	}
 }
 
@@ -964,6 +1021,7 @@ int main (int argc, char *argv[]) {
 						cout << dec << NIT[SDT[(*ii).first].tsid].fec_inner << ",";
 						cout << dec << NIT[SDT[(*ii).first].tsid].modulation_type << ",";
 						cout << dec << NIT[SDT[(*ii).first].tsid].roll_off << ",";
+						cout << "\"" << SDT[(*ii).first].category << "\"," ;
 						cout << "\"" << SDT[(*ii).first].name << "\"," ;
 						cout << "\"" << BAT_DESCRIPTION[i] << "\"" ;
 						cout << endl;
@@ -1107,7 +1165,8 @@ int main (int argc, char *argv[]) {
 			"<th>TSID</th>\n"
 			"<th>Free CA</th>\n"
 			"<th>Type</th>\n"
-			"<th>Type Name</th>\n";
+			"<th>Type Name</th>\n"
+			"<th>Category</th>\n";
 
 	memset(f, '\0', 256);
 	sprintf(f, "%s/sdt.html", dest_path);
@@ -1129,6 +1188,7 @@ int main (int argc, char *argv[]) {
 		dat_sdt << HTML_TITLE_TILDE	<< ((*i).second.ca ? "Scrambled" : " Clear ");
 		dat_sdt << HTML_TITLE_HEX	<< hex << (*i).second.type;
 		dat_sdt << HTML_TITLE_TILDE	<< sdt_typename;
+		dat_sdt << HTML_TITLE_TILDE	<< (*i).second.category.c_str();
 		dat_sdt << ( chicon ? " ~ \">\t<td class=\"icon\">" : HTML_TITLE_END_TD_NEW );
 
 		if (chicon)
@@ -1180,6 +1240,7 @@ int main (int argc, char *argv[]) {
 		dat_sdt << HTML_TD_END_NEW	<< (*i).second.ca;
 		dat_sdt << HTML_TD_END_NEW	<< (*i).second.type;
 		dat_sdt << HTML_TD_END_NEW	<< sdt_typename;
+		dat_sdt << HTML_TD_END_NEW	<< (*i).second.category.c_str();
 		dat_sdt << HTML_TITLE_END	<< endl;
 	}
 
@@ -1224,7 +1285,8 @@ int main (int argc, char *argv[]) {
 				"<th>TSID</th>\n"
 				"<th>Free CA</th>\n"
 				"<th>Type</th>\n"
-				"<th>Type Name</th>\n";
+				"<th>Type Name</th>\n"
+				"<th>Category</th>\n";
 
 		dat_index	<< HTML_TITLE_NEW << HTML_TITLE_TILDE << HTML_TITLE_BOUQUET
 				<< "0x" << hex << i << HTML_TITLE_TILDE
@@ -1263,6 +1325,7 @@ int main (int argc, char *argv[]) {
 					dat_area << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
 					dat_area << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
 					dat_area << HTML_TITLE_TILDE	<< sdt_typename;
+					dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
 					dat_area << HTML_TITLE_END_TD_NEW;
 
 					dat_area << dec << a;
@@ -1274,6 +1337,7 @@ int main (int argc, char *argv[]) {
 					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
 					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
 					dat_area << HTML_TD_END_NEW	<< sdt_typename;
+					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
 					dat_area << HTML_TITLE_END	<< endl;
 
 					char f[256]; memset(f, '\0', 256);
@@ -1317,6 +1381,7 @@ int main (int argc, char *argv[]) {
 					dat_area_region << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
 					dat_area_region << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
 					dat_area_region << HTML_TITLE_TILDE	<< sdt_typename;
+					dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
 					dat_area_region << HTML_TITLE_END_TD_NEW;
 
 					dat_area_region << dec << a;
@@ -1328,6 +1393,7 @@ int main (int argc, char *argv[]) {
 					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
 					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
 					dat_area_region << HTML_TD_END_NEW	<< sdt_typename;
+					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
 					dat_area_region << HTML_TITLE_END	<< endl;
 
 					dat_area_region.close();
