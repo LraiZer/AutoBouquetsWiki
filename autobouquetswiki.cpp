@@ -494,7 +494,7 @@ void si_parse_sdt(unsigned char *data, int length) {
 			}
 			if (tag == 0xb2)
 			{
-				if (size > 5)
+				if (size >= 4)
 				{
 					unsigned short cat_0 = data[offset2 + 4];
 					unsigned short cat_F = data[offset2 + 5];
