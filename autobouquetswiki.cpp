@@ -255,13 +255,20 @@ struct service_t {
 	short ca;
 };
 
+struct category_t {
+	unsigned short group;
+	string name;
+};
+
 sections_t NIT_SECTIONS;
 map<unsigned short, service_t> SDT;
 map<unsigned short, transport_t> NIT;
-map<unsigned short, map<unsigned short, map<unsigned short, unsigned short> > >BAT;
+map<unsigned short, map<unsigned short, map<unsigned short, unsigned short> > >BAT, CHANNEL_CATEGORY;
 map<unsigned short, sections_t> BAT_SECTIONS;
-map<unsigned short, string> BAT_DESCRIPTION;
+map<unsigned short, string> BAT_DESCRIPTION, REGION_DESCRIPTION;
+map<unsigned short, map<unsigned short, category_t> >CATEGORY_DESCRIPTION;
 
+bool freesat = false;
 bool dvbloop = true;
 unsigned short sdtmax = 0;
 
@@ -508,7 +515,7 @@ void si_parse_sdt(unsigned char *data, int length) {
 
 		char *provider_name_ptr = provider_name;
 		if (strlen(provider_name) == 0)
-			strcpy(provider_name, "BSkyB");
+			strcpy(provider_name, (freesat ? "Freesat" : "BSkyB"));
 		else if (provider_name[0] == 0x05)
 			provider_name_ptr++;
 
@@ -542,6 +549,7 @@ int si_parse_bat(unsigned char *data, int length) {
 	{
 		unsigned char descriptor_tag = data[offset1];
 		unsigned char descriptor_length = data[offset1 + 1];
+		int offset2 = offset1 + 2;
 
 		if (descriptor_tag == 0x47)
 		{
@@ -549,6 +557,74 @@ int si_parse_bat(unsigned char *data, int length) {
 			memset(description, '\0', descriptor_length + 1);
 			memcpy(description, data + offset1 + 2, descriptor_length);
 			BAT_DESCRIPTION[header.variable_id] = description;
+		}
+		else if ((descriptor_tag == 0xd4) && freesat)
+		{
+			int size = descriptor_length;
+
+			while (size > 0)
+			{
+				char description[256];
+				memset(description, '\0', 256);
+
+				int region_id = (data[offset2] << 8) | data[offset2 + 1];
+				unsigned char description_size = data[offset2 + 5];
+				if (description_size == 255)
+					description_size--;
+
+				memcpy(description, data + offset2 + 6, description_size);
+				REGION_DESCRIPTION[region_id] = description;
+
+				offset2 += (description_size + 6);
+				size -= (description_size + 6);
+			}
+		}
+		else if ((descriptor_tag == 0xd5) && freesat)
+		{
+			int size = descriptor_length;
+
+			while (size > 0)
+			{
+				unsigned short category_group = data[offset2];
+				unsigned short category_id = data[offset2 + 1];
+				unsigned short size2 = data[offset2 + 2];
+
+				offset2 += 3;
+				size -= 3;
+				while (size2 > 0)
+				{
+					unsigned short channel_id = ((data[offset2] << 8) | data[offset2 + 1]) & 0x0fff;
+					CHANNEL_CATEGORY[header.variable_id][channel_id][category_id] = category_group;
+
+					offset2 += 2;
+					size2 -= 2;
+					size -= 2;
+				}
+			}
+		}
+		else if ((descriptor_tag == 0xd8) && freesat)
+		{
+			int size = descriptor_length;
+
+			while (size > 0)
+			{
+				char description[256];
+				memset(description, '\0', 256);
+
+				//category_group usage for show+hide switches?
+				unsigned short category_group = data[offset2];
+				unsigned short category_id = data[offset2 + 1];
+				unsigned char description_size = data[offset2 + 6];
+				if (description_size == 255)
+					description_size--;
+
+				memcpy(description, data + offset2 + 7, description_size);
+				CATEGORY_DESCRIPTION[header.variable_id][category_id].group = category_group;
+				CATEGORY_DESCRIPTION[header.variable_id][category_id].name = description;
+
+				offset2 += (description_size + 7);
+				size -= (description_size + 7);
+			}
 		}
 		offset1 += (descriptor_length + 2);
 		bouquet_descriptors_length -= (descriptor_length + 2);
@@ -573,10 +649,10 @@ int si_parse_bat(unsigned char *data, int length) {
 			offset2 += (descriptor_length + 2);
 			transport_descriptor_length -= (descriptor_length + 2);
 
-			if (descriptor_tag == 0xb1)
+			if ((descriptor_tag == 0xb1) && !freesat)
 			{
 				unsigned short region_id = data[offset3 + 1];
-				
+
 				offset3 += 2;
 				descriptor_length -= 2;
 				while (descriptor_length > 0)
@@ -590,6 +666,31 @@ int si_parse_bat(unsigned char *data, int length) {
 
 					offset3 += 9;
 					descriptor_length -= 9;
+				}
+			}
+			else if ((descriptor_tag == 0xd3) && freesat)
+			{
+				while (descriptor_length > 0)
+				{
+					unsigned short service_id = (data[offset3] << 8) | data[offset3 + 1];
+					unsigned short channel_id = ((data[offset3 + 2] << 8) | data[offset3 + 3]);
+					unsigned char size = data[offset3 + 4];
+
+					SDT[service_id].channelid = channel_id;
+
+					offset3 += 5;
+					descriptor_length -= 5;
+					while (size > 0)
+					{
+						unsigned short freesat_id = ((data[offset3] << 8) | data[offset3 + 1]) & 0x0fff;
+						unsigned short region_id = data[offset3 + 3];
+
+						BAT[header.variable_id][service_id][region_id] = freesat_id;
+
+						offset3 += 4;
+						size -= 4;
+						descriptor_length -= 4;
+					}
 				}
 			}
 		}
@@ -610,10 +711,31 @@ void bouquet_check(int variable_id, sections_t *sections, unsigned char *data, i
 }
 
 int bat_sections_populated() {
-	for( unsigned short i = 0x1000; i <= 0x100e; i++ )
+	if (freesat)
 	{
-		if (!BAT_SECTIONS[i].populated)
-			return 0;
+		for( unsigned short i = 0x0100; i <= 0x0103; i++ )
+		{
+			if (!BAT_SECTIONS[i].populated)
+				return 0;
+		}
+		for( unsigned short i = 0x0110; i <= 0x0113; i++ )
+		{
+			if (!BAT_SECTIONS[i].populated)
+				return 0;
+		}
+		for( unsigned short i = 0x0118; i <= 0x011b; i++ )
+		{
+			if (!BAT_SECTIONS[i].populated)
+				return 0;
+		}
+	}
+	else
+	{
+		for( unsigned short i = 0x1000; i <= 0x100e; i++ )
+		{
+			if (!BAT_SECTIONS[i].populated)
+				return 0;
+		}
 	}
 	return 1;
 }
@@ -704,6 +826,47 @@ int si_read_network(int fd) {
 		return 1;
 
 	return 0;
+}
+
+string get_categroy_description(unsigned short filter_bat_lower, unsigned short filter_bat_upper, unsigned short filter_bat, unsigned short cat_id) {
+
+	string scd = "";
+	bool first_cat = true;
+
+	for( map<unsigned short, map<unsigned short, unsigned short> >::iterator
+	a = CHANNEL_CATEGORY[filter_bat].begin(); a != CHANNEL_CATEGORY[filter_bat].end(); ++a )
+	{
+		if ((*a).first == cat_id)
+		{
+			map<unsigned short, category_t>::iterator it;
+			for( map<unsigned short, unsigned short>::iterator
+			b = a->second.begin(); b != a->second.end(); ++b )
+			{
+				it = CATEGORY_DESCRIPTION[filter_bat].find((*b).first);
+				if (it != CATEGORY_DESCRIPTION[filter_bat].end())
+				{
+					scd += (first_cat ? "" : ":") + CATEGORY_DESCRIPTION[filter_bat][(*b).first].name;
+					first_cat = false;
+				}
+				else
+				{
+					for( unsigned short c = filter_bat_upper; c >= filter_bat_lower; c-- )
+					{
+						it = CATEGORY_DESCRIPTION[c].find((*b).first);
+						if (it != CATEGORY_DESCRIPTION[c].end())
+						{
+							scd += (first_cat ? "" : ":") + CATEGORY_DESCRIPTION[c][(*b).first].name;
+							first_cat = false;
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+	if (first_cat) return "Unassigned";
+
+	return scd;
 }
 
 string get_typename(short st) {
@@ -803,6 +966,7 @@ void show_usage(string name) {
 	<< "Usage: " << name << " [options] [argument]" << endl
 	<< "Options:" << endl
 	<< "\t-h, --help                    Show this help/example message" << endl
+	<< "\t-f, --freesat                 Scan Freesat, (default BSkyB)" << endl
 	<< "\t-c, --console-csv             Print csv database to console" << endl
 	<< "\t-w, --wiki-html               Create a wiki database in html" << endl
 	<< "\t-i, --with-icon               Download service named icons" << endl
@@ -817,6 +981,7 @@ void show_usage(string name) {
 	<< "\tautobouquetswiki --wiki-html --with-icon -b 0x100e" << endl
 	<< "\tautobouquetswiki --wiki-html --filter-bat 0x1000" << endl
 	<< "\tautobouquetswiki --wiki-html -i -b 0x1001 -r 0x7 " << endl
+	<< "\tautobouquetswiki --wiki-html --freesat" << endl
 	<< "\tautobouquetswiki --wiki-html" << endl
 	<< "\tautobouquetswiki --console-csv" << endl << endl;
 }
@@ -825,7 +990,7 @@ void show_version() {
 	cerr << endl << "AutoBouquetsWiki - 28.2e dvb stream database scanner tool" << endl
 	<< __TIMESTAMP__ << endl
 	<< "Forum - http://www.ukcvs.net" << endl
-	<< "(c) 2016 LraiZer" << endl << endl
+	<< "(c) 2017 LraiZer" << endl << endl
 	<< "For help type 'autobouquetswiki --help'" << endl
 	<< endl;
 }
@@ -835,13 +1000,12 @@ int main (int argc, char *argv[]) {
 	time_t dvb_loop_start;
 	int loop_time = 120;
 	int fd, dvb_frontend = -1, dvb_adapter = 0, dvb_demux = 0;
-	bool console_csv = false, wiki_html = false, chicon = false;
+	bool console_csv = false, wiki_html = false, chicon = false, opt_path = false;
 	unsigned short filter_bat_lower = 0x1000, filter_bat_upper = 0x100e;
  	unsigned short filter_region_lower = 0x1, filter_region_upper = 0xff;
 	char f[256], dest_path[256];
 
 	memset(dest_path, '\0', 256);
-	sprintf(dest_path, "%s/wiki", prog_path().c_str());
 
 	if (argc < 2) {
 		show_version();
@@ -855,6 +1019,8 @@ int main (int argc, char *argv[]) {
 			show_usage(argv[0]);
 			return 0;
 		}
+		else if ((arg == "-f") || (arg == "--freesat"))
+			freesat = true;
 		else if ((arg == "-c") || (arg == "--console-csv"))
 			console_csv = true;
 		else if ((arg == "-w") || (arg == "--wiki-html"))
@@ -862,8 +1028,9 @@ int main (int argc, char *argv[]) {
 		else if ((arg == "-i") || (arg == "--with-icon"))
 			chicon = true;
 		else if ((arg == "-p") || (arg == "--path")) {
-			if (i + 1 < argc)
-				sprintf(dest_path, "%s", argv[++i]);
+			if (i + 1 < argc) {
+				opt_path = true;
+				sprintf(dest_path, "%s", argv[++i]); }
 			else {
 				cerr << "--path option required" << endl;
 				return 1; }
@@ -910,12 +1077,22 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
+	if (freesat)
+	{
+		chicon = false;
+		filter_bat_lower = 0x0100;
+		filter_bat_upper = 0x011b;
+	}
+
 	if (!console_csv && !wiki_html)
 	{
 		cout << endl << "[AutoBouquetsWiki] Missing option: --console-csv, --wiki-html" << endl;
 		show_usage(argv[0]);
 		return 1;
 	}
+
+	if (!opt_path)
+		sprintf(dest_path, (freesat ? "%s/freesat" : "%s/bskyb"), prog_path().c_str());
 
 	if (!console_csv)
 	{
@@ -930,6 +1107,8 @@ int main (int argc, char *argv[]) {
 		}
 		else
 			closedir(pDir);
+
+		cout << "Scanning " << (freesat ? "Freesat" : "BSkyB") << " dvb data tables: " << dest_path << endl;
 
 		if (chicon)
 		{
@@ -966,7 +1145,7 @@ int main (int argc, char *argv[]) {
 
 	si_close(fd);
 
-	fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x11);
+	fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, (freesat ? 0x0f01 : 0x11));
 
 	dvb_loop_start = time(NULL);
 
@@ -988,6 +1167,9 @@ int main (int argc, char *argv[]) {
 	{
 		for( unsigned short i = filter_bat_lower; i <= filter_bat_upper; i++ )
 		{
+			if (strlen(BAT_DESCRIPTION[i].c_str()) == 0)
+				continue;
+
 			for( unsigned short a = filter_region_lower; a <= filter_region_upper; a++ )
 			{
 				for( map<unsigned short, map<unsigned short, unsigned short> >::iterator ii = BAT[i].begin(); ii != BAT[i].end(); ++ii )
@@ -1021,9 +1203,19 @@ int main (int argc, char *argv[]) {
 						cout << dec << NIT[SDT[(*ii).first].tsid].fec_inner << ",";
 						cout << dec << NIT[SDT[(*ii).first].tsid].modulation_type << ",";
 						cout << dec << NIT[SDT[(*ii).first].tsid].roll_off << ",";
-						cout << "\"" << SDT[(*ii).first].category << "\"," ;
+
+						if (freesat)
+							cout << "\"" << get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff) << "\",";
+						else
+							cout << "\"" << SDT[(*ii).first].category << "\"," ;
+
 						cout << "\"" << SDT[(*ii).first].name << "\"," ;
-						cout << "\"" << BAT_DESCRIPTION[i] << "\"" ;
+						cout << "\"" << BAT_DESCRIPTION[i];
+
+						if (freesat)
+							cout << ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? ("\",\"" + REGION_DESCRIPTION[a]) : "");
+
+						cout << "\"" ;
 						cout << endl;
 					}
 				}
@@ -1180,6 +1372,39 @@ int main (int argc, char *argv[]) {
 	for( map<unsigned short, service_t>::iterator i = SDT.begin(); i != SDT.end(); ++i )
 	{
 		string sdt_typename = get_typename((*i).second.type);
+		string sdt_category = "";
+
+		if (freesat)
+		{
+			bool first_cat = true;
+			for( unsigned short a = filter_bat_lower; a <= filter_bat_upper; a++ )
+			{
+				for( map<unsigned short, map<unsigned short, unsigned short> >::iterator
+				b = CHANNEL_CATEGORY[a].begin(); b != CHANNEL_CATEGORY[a].end(); ++b )
+				{
+					if ((*b).first == ((*i).second.channelid & 0x0fff))
+					{
+						for( map<unsigned short, unsigned short>::iterator
+						c = b->second.begin(); c != b->second.end(); ++c )
+						{
+							map<unsigned short, category_t>::iterator
+							it = CATEGORY_DESCRIPTION[a].find((*c).first);
+							if (it == CATEGORY_DESCRIPTION[a].end())
+								break;
+
+							size_t found = sdt_category.find(CATEGORY_DESCRIPTION[a][(*c).first].name);
+							if (found != string::npos) (void)found;
+							else
+							{
+								sdt_category += (first_cat ? "" : ":") + CATEGORY_DESCRIPTION[a][(*c).first].name;
+								first_cat = false;
+							}
+						}
+					}
+				}
+			}
+			if (first_cat) sdt_category = "Unassigned";
+		}
 
 		dat_sdt << HTML_TITLE_NEW	<< HTML_TITLE_TILDE << UTF8_to_UTF8XML((*i).second.name.c_str());
 		dat_sdt << HTML_TITLE_TILDE	<< (*i).second.channelid;
@@ -1188,7 +1413,10 @@ int main (int argc, char *argv[]) {
 		dat_sdt << HTML_TITLE_TILDE	<< ((*i).second.ca ? "Scrambled" : " Clear ");
 		dat_sdt << HTML_TITLE_HEX	<< hex << (*i).second.type;
 		dat_sdt << HTML_TITLE_TILDE	<< sdt_typename;
-		dat_sdt << HTML_TITLE_TILDE	<< (*i).second.category.c_str();
+		if (freesat)
+		 dat_sdt << HTML_TITLE_TILDE	<< sdt_category;
+		else
+		 dat_sdt << HTML_TITLE_TILDE	<< (*i).second.category.c_str();
 		dat_sdt << ( chicon ? " ~ \">\t<td class=\"icon\">" : HTML_TITLE_END_TD_NEW );
 
 		if (chicon)
@@ -1240,7 +1468,10 @@ int main (int argc, char *argv[]) {
 		dat_sdt << HTML_TD_END_NEW	<< (*i).second.ca;
 		dat_sdt << HTML_TD_END_NEW	<< (*i).second.type;
 		dat_sdt << HTML_TD_END_NEW	<< sdt_typename;
-		dat_sdt << HTML_TD_END_NEW	<< (*i).second.category.c_str();
+		if (freesat)
+		 dat_sdt << HTML_TD_END_NEW	<< sdt_category;
+		else
+		 dat_sdt << HTML_TD_END_NEW	<< (*i).second.category.c_str();
 		dat_sdt << HTML_TITLE_END	<< endl;
 	}
 
@@ -1248,7 +1479,10 @@ int main (int argc, char *argv[]) {
 	dat_sdt.close();
 
 	// index html
-	HTML_TITLES =	"28.2e BSkyB Network DVB Tables";
+	if (freesat)
+		HTML_TITLES =	"28.2e Freesat Network DVB Tables";
+	else
+		HTML_TITLES =	"28.2e BSkyB Network DVB Tables";
 	HTML_COLUMN =	"<th class=\"sorttable_alpha\">Sort List</th>\n"
 			"<th class=\"sorttable_alpha\">Sort Table</th>\n"
 			"</tr>\n";
@@ -1276,6 +1510,9 @@ int main (int argc, char *argv[]) {
 	// bouquet areas html
 	for( unsigned short i = filter_bat_lower; i <= filter_bat_upper; i++ )
 	{
+		if (strlen(BAT_DESCRIPTION[i].c_str()) == 0)
+			continue;
+
 		HTML_TITLES =	BAT_DESCRIPTION[i];
 		HTML_COLUMN =	"<th>Region ID</th>\n"
 				"<th>Position</th>\n"
@@ -1325,19 +1562,25 @@ int main (int argc, char *argv[]) {
 					dat_area << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
 					dat_area << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
 					dat_area << HTML_TITLE_TILDE	<< sdt_typename;
-					dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
+					if (freesat)
+					 dat_area << HTML_TITLE_TILDE	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+					else
+					 dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
 					dat_area << HTML_TITLE_END_TD_NEW;
 
 					dat_area << dec << a;
 					dat_area << HTML_TD_END_NEW	<< dec << (*ii).second[a];
 					dat_area << HTML_TD_END_NEW	<< dec << UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
-					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;;
+					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;
 					dat_area << HTML_TD_END_NEW	<< (*ii).first;
 					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].tsid;
 					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
 					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
 					dat_area << HTML_TD_END_NEW	<< sdt_typename;
-					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
+					if (freesat)
+					 dat_area << HTML_TD_END_NEW	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+					else
+					 dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
 					dat_area << HTML_TITLE_END	<< endl;
 
 					char f[256]; memset(f, '\0', 256);
@@ -1347,16 +1590,21 @@ int main (int argc, char *argv[]) {
 					// write header on first open only
 					if (area_region_file_open == false)
 					{
+						string region_description = "";
+
+						if (freesat)
+							region_description = ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? (" - " + REGION_DESCRIPTION[a]) : "");
+
 						dat_area_region.open (f, ofstream::out);
 
 						dat_index	<< HTML_TITLE_NEW << HTML_TITLE_TILDE << HTML_TITLE_BOUQUET << "0x" << hex << i
 								<< HTML_TITLE_TILDE << HTML_TITLE_REGION << "0x" << hex << a
-								<< HTML_TITLE_TILDE << HTML_TITLES << HTML_TITLE_END_TD_NEW;
+								<< HTML_TITLE_TILDE << HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END_TD_NEW;
 
 						dat_index 	<< HTML_HREF_NEW << dec << i << "-" << dec << a << ".html\">"
 								<< HTML_TITLE_BOUQUET << dec << i << " - "
 								<< HTML_TITLE_REGION << dec << a
-								<< HTML_REF_END_TD_NEW	<< HTML_TITLES << HTML_TITLE_END << endl;
+								<< HTML_REF_END_TD_NEW	<< HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END << endl;
 
 						dat_area_region << HTML_HEADER1 << HTML_TITLE_BOUQUET << dec << i << " - "
 								<< HTML_TITLE_REGION << dec << a << " - "
@@ -1381,19 +1629,25 @@ int main (int argc, char *argv[]) {
 					dat_area_region << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
 					dat_area_region << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
 					dat_area_region << HTML_TITLE_TILDE	<< sdt_typename;
-					dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
+					if (freesat)
+					 dat_area_region << HTML_TITLE_TILDE	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+					else
+					 dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
 					dat_area_region << HTML_TITLE_END_TD_NEW;
 
 					dat_area_region << dec << a;
 					dat_area_region << HTML_TD_END_NEW	<< dec << (*ii).second[a];
 					dat_area_region << HTML_TD_END_NEW	<< dec << UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
-					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;;
+					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;
 					dat_area_region << HTML_TD_END_NEW	<< (*ii).first;
 					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].tsid;
 					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
 					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
 					dat_area_region << HTML_TD_END_NEW	<< sdt_typename;
-					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
+					if (freesat)
+					 dat_area_region << HTML_TD_END_NEW	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+					else
+					 dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
 					dat_area_region << HTML_TITLE_END	<< endl;
 
 					dat_area_region.close();
