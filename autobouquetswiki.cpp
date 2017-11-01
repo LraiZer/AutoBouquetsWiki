@@ -364,7 +364,7 @@ int sections_check(sections_t *sections) {
 	return 1;
 }
 
-void network_check(int variable_id, sections_t *sections, unsigned char *data, int length) {
+void network_check(sections_t *sections, unsigned char *data, int length) {
 	if (!sections->received_section[header.section_number])
 	{
 		if (si_parse_nit(data, length))
@@ -698,7 +698,7 @@ int si_parse_bat(unsigned char *data, int length) {
 	return 1;
 }
 
-void bouquet_check(int variable_id, sections_t *sections, unsigned char *data, int length) {
+void bouquet_check(sections_t *sections, unsigned char *data, int length) {
 	if (!sections->received_section[header.section_number])
 	{
 		if (si_parse_bat(data, length))
@@ -773,7 +773,7 @@ int si_read_bouquets(int fd) {
 		if (header.table_id == 0x4a)
 		{
 			if ( !BAT_SECTIONS[header.variable_id].populated )
-				bouquet_check(header.variable_id, &BAT_SECTIONS[header.variable_id], buffer, section_length);
+				bouquet_check(&BAT_SECTIONS[header.variable_id], buffer, section_length);
 		}
 		else if (header.table_id == 0x42 || header.table_id == 0x46)
 		{
@@ -819,8 +819,7 @@ int si_read_network(int fd) {
 
 	si_parse_header(buffer);
 
-	if ( header.variable_id == 0x20 )
-		network_check(0x20, &NIT_SECTIONS, buffer, section_length);
+	network_check(&NIT_SECTIONS, buffer, section_length);
 
 	if ( NIT_SECTIONS.populated )
 		return 1;
@@ -1000,7 +999,8 @@ int main (int argc, char *argv[]) {
 	time_t dvb_loop_start;
 	int loop_time = 120;
 	int fd, dvb_frontend = -1, dvb_adapter = 0, dvb_demux = 0;
-	bool console_csv = false, wiki_html = false, chicon = false, opt_path = false;
+	bool console_csv = false, wiki_html = false;
+	bool chicon = false, opt_path = false, filter_bat = false;
 	unsigned short filter_bat_lower = 0x1000, filter_bat_upper = 0x100e;
  	unsigned short filter_region_lower = 0x1, filter_region_upper = 0xff;
 	char f[256], dest_path[256];
@@ -1036,8 +1036,9 @@ int main (int argc, char *argv[]) {
 				return 1; }
 		}
 		else if ((arg == "-b") || (arg == "--filter-bat")) {
-			if (i + 1 < argc)
-				filter_bat_lower = filter_bat_upper = strtol(argv[++i], NULL, 0);
+			if (i + 1 < argc) {
+				filter_bat = true;
+				filter_bat_lower = filter_bat_upper = strtol(argv[++i], NULL, 0); }
 			else {
 				cerr << "--filter-bat option required" << endl;
 				return 1; }
@@ -1080,8 +1081,11 @@ int main (int argc, char *argv[]) {
 	if (freesat)
 	{
 		chicon = false;
-		filter_bat_lower = 0x0100;
-		filter_bat_upper = 0x011b;
+		if (!filter_bat)
+		{
+			filter_bat_lower = 0x0100;
+			filter_bat_upper = 0x011b;
+		}
 	}
 
 	if (!console_csv && !wiki_html)
@@ -1145,21 +1149,64 @@ int main (int argc, char *argv[]) {
 
 	si_close(fd);
 
-	fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, (freesat ? 0x0f01 : 0x11));
-
-	dvb_loop_start = time(NULL);
-
-	while(si_read_bouquets(fd) < 1)
+	if (freesat)
 	{
-		if (time(NULL) > dvb_loop_start + loop_time)
+		bool bouquets_read = true;
+
+		//try HOME transponder pid first
+		fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x0bba);
+
+		dvb_loop_start = time(NULL);
+
+		while(si_read_bouquets(fd) < 1)
 		{
-			printf("[AutoBouquetsWiki] read bouquets timeout! %i seconds\n", loop_time);
+			if (time(NULL) > dvb_loop_start + loop_time)
+			{
+				bouquets_read = false;
+				cerr << "[AutoBouquetsWiki] pid:0x0bba, read bouquets timeout! "<< loop_time << " seconds." <<
+				endl << "[AutoBouquetsWiki] HOME tsid pid not found.. trying pid: 0x0f01" << endl;
+				break;
+			}
+		}
+
+		si_close(fd);
+
+		if (!bouquets_read)
+		{
+			//try OTHER transponder pid, if home transponder not found
+			fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x0f01);
+
+			dvb_loop_start = time(NULL);
+
+			while(si_read_bouquets(fd) < 1)
+			{
+				if (time(NULL) > dvb_loop_start + loop_time)
+				{
+					printf("[AutoBouquetsWiki] pid:0x0f01, read bouquets timeout! %i seconds\n", loop_time);
+					si_close(fd);
+					return -1;
+				}
+			}
+
 			si_close(fd);
-			return -1;
 		}
 	}
+	else
+	{
+		fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x11);
 
-	si_close(fd);
+		dvb_loop_start = time(NULL);
+
+		while(si_read_bouquets(fd) < 1)
+		{
+			if (time(NULL) > dvb_loop_start + loop_time)
+			{
+				printf("[AutoBouquetsWiki] pid:0x11, read bouquets timeout! %i seconds\n", loop_time);
+				si_close(fd);
+				return -1;
+			}
+		}
+	}
 
 	// output CSV (comma separated values) to console,
 	// instead of creating html wiki web pages.
