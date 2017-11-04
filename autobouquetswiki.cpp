@@ -1135,24 +1135,48 @@ int main (int argc, char *argv[]) {
 		}
 	}
 
-	fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x10);
-
-	dvb_loop_start = time(NULL);
-
-	while(si_read_network(fd) < 1)
-	{
-		if (time(NULL) > dvb_loop_start + loop_time)
-		{
-			printf("[AutoBouquetsWiki] read network timeout! %i seconds\n", loop_time);
-			si_close(fd);
-			return -1;
-		}
-	}
-
-	si_close(fd);
-
 	if (freesat)
 	{
+		bool network_read = true;
+
+		//try freesat pid first (sid:0x0bb9)
+		fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x0f00);
+
+		dvb_loop_start = time(NULL);
+
+		while(si_read_network(fd) < 1)
+		{
+			if (time(NULL) > dvb_loop_start + loop_time)
+			{
+				network_read = false;
+				cerr << "[AutoBouquetsWiki] pid:0x0f00, read network timeout! "<< loop_time << " seconds." <<
+				endl << "[AutoBouquetsWiki] Freesat pid not found.. trying pid: 0x10" << endl;
+				break;
+			}
+		}
+
+		si_close(fd);
+
+		if (!network_read)
+		{
+			//try NIT pid, if freesat pid not found
+			fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x10);
+
+			dvb_loop_start = time(NULL);
+
+			while(si_read_network(fd) < 1)
+			{
+				if (time(NULL) > dvb_loop_start + loop_time)
+				{
+					printf("[AutoBouquetsWiki] pid:0x10, read network timeout! %i seconds\n", loop_time);
+					si_close(fd);
+					return -1;
+				}
+			}
+
+			si_close(fd);
+		}
+
 		bool bouquets_read = true;
 
 		//try HOME transponder pid first
@@ -1195,6 +1219,22 @@ int main (int argc, char *argv[]) {
 	}
 	else
 	{
+		fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x10);
+
+		dvb_loop_start = time(NULL);
+
+		while(si_read_network(fd) < 1)
+		{
+			if (time(NULL) > dvb_loop_start + loop_time)
+			{
+				printf("[AutoBouquetsWiki] pid:0x10, read network timeout! %i seconds\n", loop_time);
+				si_close(fd);
+				return -1;
+			}
+		}
+
+		si_close(fd);
+
 		fd = si_open(dvb_frontend, dvb_adapter, dvb_demux, 0x11);
 
 		dvb_loop_start = time(NULL);
