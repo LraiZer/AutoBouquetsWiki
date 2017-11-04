@@ -14,6 +14,7 @@
 #include <sstream>
 #include <iomanip>
 #include <map>
+#include <list>
 
 #include <linux/dvb/frontend.h>
 #include <linux/dvb/dmx.h>
@@ -263,7 +264,8 @@ struct category_t {
 sections_t NIT_SECTIONS;
 map<unsigned short, service_t> SDT;
 map<unsigned short, transport_t> NIT;
-map<unsigned short, map<unsigned short, map<unsigned short, unsigned short> > >BAT, CHANNEL_CATEGORY;
+map<unsigned short, map<unsigned short, map<unsigned short, unsigned short> > >CHANNEL_CATEGORY;
+map<unsigned short, map<unsigned short, map<unsigned short, list<unsigned short> > > >BAT;
 map<unsigned short, sections_t> BAT_SECTIONS;
 map<unsigned short, string> BAT_DESCRIPTION, REGION_DESCRIPTION;
 map<unsigned short, map<unsigned short, category_t> >CATEGORY_DESCRIPTION;
@@ -661,7 +663,7 @@ int si_parse_bat(unsigned char *data, int length) {
 					unsigned short sky_id = ( data[offset3 + 5] << 8 ) | data[offset3 + 6];
 					unsigned short service_id = (data[offset3] << 8) | data[offset3 + 1];
 
-					BAT[header.variable_id][service_id][region_id] = sky_id;
+					BAT[header.variable_id][service_id][region_id].push_back(sky_id);
 					SDT[service_id].channelid = channel_id;
 
 					offset3 += 9;
@@ -685,7 +687,7 @@ int si_parse_bat(unsigned char *data, int length) {
 						unsigned short freesat_id = ((data[offset3] << 8) | data[offset3 + 1]) & 0x0fff;
 						unsigned short region_id = data[offset3 + 3];
 
-						BAT[header.variable_id][service_id][region_id] = freesat_id;
+						BAT[header.variable_id][service_id][region_id].push_back(freesat_id);
 
 						offset3 += 4;
 						size -= 4;
@@ -1219,51 +1221,54 @@ int main (int argc, char *argv[]) {
 
 			for( unsigned short a = filter_region_lower; a <= filter_region_upper; a++ )
 			{
-				for( map<unsigned short, map<unsigned short, unsigned short> >::iterator ii = BAT[i].begin(); ii != BAT[i].end(); ++ii )
+				for( map<unsigned short, map<unsigned short, list<unsigned short> > >::iterator ii = BAT[i].begin(); ii != BAT[i].end(); ++ii )
 				{
-					if ( (*ii).second[a] != 0 )
+					for (list<unsigned short>::iterator iii = (*ii).second[a].begin(); iii != (*ii).second[a].end(); ++iii)
 					{
-						cout << "0x";
-						cout << hex << right << setw(4) << setfill('0') << i << ",0x";
-						cout << hex << right << setw(2) << setfill('0') << a << ",";
-						cout << dec << right << setw(4) << setfill('0') << (*ii).second[a] << ",0x";
-						cout << hex << right << setw(4) << setfill('0') << SDT[(*ii).first].channelid << ",0x";
-						cout << hex << right << setw(4) << setfill('0') << (*ii).first << ",0x";
-						cout << hex << right << setw(4) << setfill('0') << SDT[(*ii).first].tsid << ",0x";
-						cout << hex << right << setw(2) << setfill('0') << SDT[(*ii).first].type << ",";
-						cout << dec << SDT[(*ii).first].ca << ",0x";
+						if ( *iii != 0 )
+						{
+							cout << "0x";
+							cout << hex << right << setw(4) << setfill('0') << i << ",0x";
+							cout << hex << right << setw(2) << setfill('0') << a << ",";
+							cout << dec << right << setw(4) << setfill('0') << *iii << ",0x";
+							cout << hex << right << setw(4) << setfill('0') << SDT[(*ii).first].channelid << ",0x";
+							cout << hex << right << setw(4) << setfill('0') << (*ii).first << ",0x";
+							cout << hex << right << setw(4) << setfill('0') << SDT[(*ii).first].tsid << ",0x";
+							cout << hex << right << setw(2) << setfill('0') << SDT[(*ii).first].type << ",";
+							cout << dec << SDT[(*ii).first].ca << ",0x";
 
-						unsigned long orbital_position_namespace = 282 << 16;
-						// 7e3 tsid unique namespace
-						if (SDT[(*ii).first].tsid == 2019) 
-							orbital_position_namespace |=
-							((NIT[SDT[(*ii).first].tsid].frequency/1000)*10)+
-							(NIT[SDT[(*ii).first].tsid].polarization);
+							unsigned long orbital_position_namespace = 282 << 16;
+							// 7e3 tsid unique namespace
+							if (SDT[(*ii).first].tsid == 2019)
+								orbital_position_namespace |=
+								((NIT[SDT[(*ii).first].tsid].frequency/1000)*10)+
+								(NIT[SDT[(*ii).first].tsid].polarization);
 
-						cout << hex << right << setw(8) << setfill('0') << orbital_position_namespace << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].original_network_id << ",";
-						cout << hex << NIT[SDT[(*ii).first].tsid].orbital_position << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].west_east_flag << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].frequency << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].symbol_rate << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].polarization << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].fec_inner << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].modulation_type << ",";
-						cout << dec << NIT[SDT[(*ii).first].tsid].roll_off << ",";
+							cout << hex << right << setw(8) << setfill('0') << orbital_position_namespace << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].original_network_id << ",";
+							cout << hex << NIT[SDT[(*ii).first].tsid].orbital_position << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].west_east_flag << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].frequency << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].symbol_rate << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].polarization << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].fec_inner << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].modulation_type << ",";
+							cout << dec << NIT[SDT[(*ii).first].tsid].roll_off << ",";
 
-						if (freesat)
-							cout << "\"" << get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff) << "\",";
-						else
-							cout << "\"" << SDT[(*ii).first].category << "\"," ;
+							if (freesat)
+								cout << "\"" << get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff) << "\",";
+							else
+								cout << "\"" << SDT[(*ii).first].category << "\"," ;
 
-						cout << "\"" << SDT[(*ii).first].name << "\"," ;
-						cout << "\"" << BAT_DESCRIPTION[i];
+							cout << "\"" << SDT[(*ii).first].name << "\"," ;
+							cout << "\"" << BAT_DESCRIPTION[i];
 
-						if (freesat)
-							cout << ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? ("\",\"" + REGION_DESCRIPTION[a]) : "");
+							if (freesat)
+								cout << ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? ("\",\"" + REGION_DESCRIPTION[a]) : "");
 
-						cout << "\"" ;
-						cout << endl;
+							cout << "\"" ;
+							cout << endl;
+						}
 					}
 				}
 				BAT[i][a].clear();
@@ -1593,111 +1598,114 @@ int main (int argc, char *argv[]) {
 		{
 			bool area_region_file_open = false;
 
-			for( map<unsigned short, map<unsigned short, unsigned short> >::iterator ii = BAT[i].begin(); ii != BAT[i].end(); ++ii )
+			for( map<unsigned short, map<unsigned short, list<unsigned short> > >::iterator ii = BAT[i].begin(); ii != BAT[i].end(); ++ii )
 			{
-				if ( (*ii).second[a] != 0 )
+				for (list<unsigned short>::iterator iii = (*ii).second[a].begin(); iii != (*ii).second[a].end(); ++iii)
 				{
-					string sdt_typename = get_typename(SDT[(*ii).first].type);
-
-					// area html
-					dat_area << HTML_TITLE_NEW	<< HTML_TITLE_HEX << hex << a;
-					dat_area << HTML_TITLE_TILDE	<< dec << (*ii).second[a];
-					dat_area << HTML_TITLE_TILDE	<< UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
-					dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].channelid;
-					dat_area << HTML_TITLE_HEX	<< hex << (*ii).first;
-					dat_area << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].tsid;
-					dat_area << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
-					dat_area << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
-					dat_area << HTML_TITLE_TILDE	<< sdt_typename;
-					if (freesat)
-					 dat_area << HTML_TITLE_TILDE	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
-					else
-					 dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
-					dat_area << HTML_TITLE_END_TD_NEW;
-
-					dat_area << dec << a;
-					dat_area << HTML_TD_END_NEW	<< dec << (*ii).second[a];
-					dat_area << HTML_TD_END_NEW	<< dec << UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
-					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;
-					dat_area << HTML_TD_END_NEW	<< (*ii).first;
-					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].tsid;
-					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
-					dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
-					dat_area << HTML_TD_END_NEW	<< sdt_typename;
-					if (freesat)
-					 dat_area << HTML_TD_END_NEW	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
-					else
-					 dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
-					dat_area << HTML_TITLE_END	<< endl;
-
-					char f[256]; memset(f, '\0', 256);
-					sprintf(f, "%s/%i-%i.html", dest_path, i, a);
-					ofstream dat_area_region;
-
-					// write header on first open only
-					if (area_region_file_open == false)
+					if ( *iii != 0 )
 					{
-						string region_description = "";
+						string sdt_typename = get_typename(SDT[(*ii).first].type);
 
+						// area html
+						dat_area << HTML_TITLE_NEW	<< HTML_TITLE_HEX << hex << a;
+						dat_area << HTML_TITLE_TILDE	<< dec << *iii;
+						dat_area << HTML_TITLE_TILDE	<< UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
+						dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].channelid;
+						dat_area << HTML_TITLE_HEX	<< hex << (*ii).first;
+						dat_area << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].tsid;
+						dat_area << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
+						dat_area << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
+						dat_area << HTML_TITLE_TILDE	<< sdt_typename;
 						if (freesat)
-							region_description = ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? (" - " + REGION_DESCRIPTION[a]) : "");
+						 dat_area << HTML_TITLE_TILDE	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+						else
+						 dat_area << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
+						dat_area << HTML_TITLE_END_TD_NEW;
 
-						dat_area_region.open (f, ofstream::out);
+						dat_area << dec << a;
+						dat_area << HTML_TD_END_NEW	<< dec << *iii;
+						dat_area << HTML_TD_END_NEW	<< dec << UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
+						dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;
+						dat_area << HTML_TD_END_NEW	<< (*ii).first;
+						dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].tsid;
+						dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
+						dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
+						dat_area << HTML_TD_END_NEW	<< sdt_typename;
+						if (freesat)
+						 dat_area << HTML_TD_END_NEW	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+						else
+						 dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
+						dat_area << HTML_TITLE_END	<< endl;
 
-						dat_index	<< HTML_TITLE_NEW << HTML_TITLE_TILDE << HTML_TITLE_BOUQUET << "0x" << hex << i
-								<< HTML_TITLE_TILDE << HTML_TITLE_REGION << "0x" << hex << a
-								<< HTML_TITLE_TILDE << HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END_TD_NEW;
+						char f[256]; memset(f, '\0', 256);
+						sprintf(f, "%s/%i-%i.html", dest_path, i, a);
+						ofstream dat_area_region;
 
-						dat_index 	<< HTML_HREF_NEW << dec << i << "-" << dec << a << ".html\">"
-								<< HTML_TITLE_BOUQUET << dec << i << " - "
-								<< HTML_TITLE_REGION << dec << a
-								<< HTML_REF_END_TD_NEW	<< HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END << endl;
+						// write header on first open only
+						if (area_region_file_open == false)
+						{
+							string region_description = "";
 
-						dat_area_region << HTML_HEADER1 << HTML_TITLE_BOUQUET << dec << i << " - "
-								<< HTML_TITLE_REGION << dec << a << " - "
-								<< HTML_TITLES << HTML_HEADER2 << HTML_TITLE_BOUQUET << dec << i << " - "
-								<< HTML_TITLE_REGION << dec << a << " - "
-								<< HTML_TITLES << HTML_HEADER3 << __DATE__
-								<< HTML_HEADER4 << currentDateTime()
-								<< HTML_HEADER5 << HTML_COLUMN;
+							if (freesat)
+								region_description = ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? (" - " + REGION_DESCRIPTION[a]) : "");
 
-						area_region_file_open = true;
+							dat_area_region.open (f, ofstream::out);
+
+							dat_index	<< HTML_TITLE_NEW << HTML_TITLE_TILDE << HTML_TITLE_BOUQUET << "0x" << hex << i
+									<< HTML_TITLE_TILDE << HTML_TITLE_REGION << "0x" << hex << a
+									<< HTML_TITLE_TILDE << HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END_TD_NEW;
+
+							dat_index 	<< HTML_HREF_NEW << dec << i << "-" << dec << a << ".html\">"
+									<< HTML_TITLE_BOUQUET << dec << i << " - "
+									<< HTML_TITLE_REGION << dec << a
+									<< HTML_REF_END_TD_NEW	<< HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END << endl;
+
+							dat_area_region << HTML_HEADER1 << HTML_TITLE_BOUQUET << dec << i << " - "
+									<< HTML_TITLE_REGION << dec << a << " - "
+									<< HTML_TITLES << HTML_HEADER2 << HTML_TITLE_BOUQUET << dec << i << " - "
+									<< HTML_TITLE_REGION << dec << a << " - "
+									<< HTML_TITLES << HTML_HEADER3 << __DATE__
+									<< HTML_HEADER4 << currentDateTime()
+									<< HTML_HEADER5 << HTML_COLUMN;
+
+							area_region_file_open = true;
+						}
+						else
+							dat_area_region.open (f, ofstream::app);
+
+						// area-region html
+						dat_area_region << HTML_TITLE_NEW	<< HTML_TITLE_HEX << hex << a;
+						dat_area_region << HTML_TITLE_TILDE	<< dec << *iii;
+						dat_area_region << HTML_TITLE_TILDE	<< UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
+						dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].channelid;
+						dat_area_region << HTML_TITLE_HEX	<< hex << (*ii).first;
+						dat_area_region << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].tsid;
+						dat_area_region << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
+						dat_area_region << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
+						dat_area_region << HTML_TITLE_TILDE	<< sdt_typename;
+						if (freesat)
+						 dat_area_region << HTML_TITLE_TILDE	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+						else
+						 dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
+						dat_area_region << HTML_TITLE_END_TD_NEW;
+
+						dat_area_region << dec << a;
+						dat_area_region << HTML_TD_END_NEW	<< dec << *iii;
+						dat_area_region << HTML_TD_END_NEW	<< dec << UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
+						dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;
+						dat_area_region << HTML_TD_END_NEW	<< (*ii).first;
+						dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].tsid;
+						dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
+						dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
+						dat_area_region << HTML_TD_END_NEW	<< sdt_typename;
+						if (freesat)
+						 dat_area_region << HTML_TD_END_NEW	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
+						else
+						 dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
+						dat_area_region << HTML_TITLE_END	<< endl;
+
+						dat_area_region.close();
 					}
-					else
-						dat_area_region.open (f, ofstream::app);
-
-					// area-region html
-					dat_area_region << HTML_TITLE_NEW	<< HTML_TITLE_HEX << hex << a;
-					dat_area_region << HTML_TITLE_TILDE	<< dec << (*ii).second[a];
-					dat_area_region << HTML_TITLE_TILDE	<< UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
-					dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].channelid;
-					dat_area_region << HTML_TITLE_HEX	<< hex << (*ii).first;
-					dat_area_region << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].tsid;
-					dat_area_region << HTML_TITLE_TILDE	<< (SDT[(*ii).first].ca ? "Scrambled" : " Clear ");
-					dat_area_region << HTML_TITLE_HEX	<< hex << SDT[(*ii).first].type;
-					dat_area_region << HTML_TITLE_TILDE	<< sdt_typename;
-					if (freesat)
-					 dat_area_region << HTML_TITLE_TILDE	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
-					else
-					 dat_area_region << HTML_TITLE_TILDE	<< SDT[(*ii).first].category;
-					dat_area_region << HTML_TITLE_END_TD_NEW;
-
-					dat_area_region << dec << a;
-					dat_area_region << HTML_TD_END_NEW	<< dec << (*ii).second[a];
-					dat_area_region << HTML_TD_END_NEW	<< dec << UTF8_to_UTF8XML(SDT[(*ii).first].name.c_str());
-					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].channelid;
-					dat_area_region << HTML_TD_END_NEW	<< (*ii).first;
-					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].tsid;
-					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].ca;
-					dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].type;
-					dat_area_region << HTML_TD_END_NEW	<< sdt_typename;
-					if (freesat)
-					 dat_area_region << HTML_TD_END_NEW	<< get_categroy_description(filter_bat_lower, filter_bat_upper, i, SDT[(*ii).first].channelid & 0x0fff);
-					else
-					 dat_area_region << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
-					dat_area_region << HTML_TITLE_END	<< endl;
-
-					dat_area_region.close();
 				}
 			}
 
