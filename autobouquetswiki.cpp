@@ -589,7 +589,7 @@ int si_parse_bat(unsigned char *data, int length) {
 			{
 				unsigned short category_group = data[offset2];
 				unsigned short category_id = data[offset2 + 1];
-				unsigned short size2 = data[offset2 + 2];
+				short size2 = data[offset2 + 2];
 
 				offset2 += 3;
 				size -= 3;
