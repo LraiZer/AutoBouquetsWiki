@@ -585,7 +585,7 @@ int si_parse_bat(unsigned char *data, int length) {
 		{
 			int size = descriptor_length;
 
-			while (size > 0)
+			while (size > 2)
 			{
 				unsigned short category_group = data[offset2];
 				unsigned short category_id = data[offset2 + 1];
@@ -593,7 +593,7 @@ int si_parse_bat(unsigned char *data, int length) {
 
 				offset2 += 3;
 				size -= 3;
-				while (size2 > 0)
+				while (size2 > 1)
 				{
 					unsigned short channel_id = ((data[offset2] << 8) | data[offset2 + 1]) & 0x0fff;
 					CHANNEL_CATEGORY[header.variable_id][channel_id][category_id] = category_group;
