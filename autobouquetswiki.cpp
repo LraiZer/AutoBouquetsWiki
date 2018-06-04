@@ -903,6 +903,7 @@ string get_typename(short st) {
 		case 0x1D: stn = "3D HD NVOD time-shift"; break;
 		case 0x1E: stn = "3D HD NVOD reference"; break;
 		case 0x1F: stn = "HEVC TV"; break;
+		case 0x20: stn = "HEVC TV UHD[HDR]"; break;
 
 		// user defined service types, so lets define our own ;)
 		case 0x00: stn = "SD TV OnDemand"; break;
