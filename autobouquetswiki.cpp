@@ -41,6 +41,7 @@ typedef enum dmx_source {
 #include "icon.inc"
 
 #define DVB_BUFFER_SIZE 2*4096
+#define DATA_SIZE 270
 
 using namespace std;
 
@@ -1024,7 +1025,7 @@ int main (int argc, char *argv[]) {
 	bool chicon = false, opt_path = false, filter_bat = false;
 	unsigned short filter_bat_lower = 0x1000, filter_bat_upper = 0x100e;
  	unsigned short filter_region_lower = 0x1, filter_region_upper = 0xff;
-	char f[256], dest_path[256];
+	char f[DATA_SIZE], dest_path[256];
 
 	memset(dest_path, '\0', 256);
 
@@ -1137,8 +1138,8 @@ int main (int argc, char *argv[]) {
 
 		if (chicon)
 		{
-			char icon_path[256];
-			memset(icon_path, '\0', 256);
+			char icon_path[DATA_SIZE];
+			memset(icon_path, '\0', DATA_SIZE);
 			sprintf(icon_path, "%s/icon", dest_path);
 			DIR *pDir = opendir(icon_path);
 			if (pDir == NULL)
@@ -1417,7 +1418,7 @@ int main (int argc, char *argv[]) {
 			"<th>System</th>\n"
 			"</tr>\n";
 
-	memset(f, '\0', 256);
+	memset(f, '\0', DATA_SIZE);
 	sprintf(f, "%s/nit.html", dest_path);
 	ofstream dat_nit (f, ofstream::out);
 
@@ -1534,8 +1535,8 @@ int main (int argc, char *argv[]) {
 		{
 			if ((*i).second.channelid > 0)
 			{
-				char pcmd[256];
-				memset(pcmd, '\0', 256);
+				char pcmd[DATA_SIZE];
+				memset(pcmd, '\0', DATA_SIZE);
 				string chicon_name = ICON_NAME((*i).second.name.c_str());
 
 				// 4.5 MB
@@ -1644,7 +1645,7 @@ int main (int argc, char *argv[]) {
 				<< HTML_TITLE_DASH << HTML_TITLES
 				<< HTML_REF_END_TD_NEW << HTML_TITLE_END << endl;
 
-		char f[256]; memset(f, '\0', 256);
+		char f[DATA_SIZE]; memset(f, '\0', 256);
 		sprintf(f, "%s/%i.html", dest_path, i);
 		ofstream dat_area (f, ofstream::out);
 
@@ -1696,7 +1697,7 @@ int main (int argc, char *argv[]) {
 						 dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
 						dat_area << HTML_TITLE_END	<< endl;
 
-						char f[256]; memset(f, '\0', 256);
+						char f[DATA_SIZE]; memset(f, '\0', DATA_SIZE);
 						sprintf(f, "%s/%i-%i.html", dest_path, i, a);
 						ofstream dat_area_region;
 
@@ -1771,7 +1772,7 @@ int main (int argc, char *argv[]) {
 			BAT[i][a].clear();
 			if (area_region_file_open)
 			{
-				char f[256]; memset(f, '\0', 256);
+				char f[DATA_SIZE]; memset(f, '\0', DATA_SIZE);
 				sprintf(f, "%s/%i-%i.html", dest_path, i, a);
 				ofstream dat_area_region (f, ofstream::app);
 				dat_area_region << HTML_FOOTER;
