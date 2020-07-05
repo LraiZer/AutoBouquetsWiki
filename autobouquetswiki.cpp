@@ -929,6 +929,7 @@ string get_typename(short st) {
 		case 0x87: stn = "HD TV OnDemand"; break;
 		case 0x85: stn = "SD TV RedButton"; break;
 		case 0x82: stn = "DATA RedButton"; break;
+		case 0x89: stn = "HD TV RedButton"; break;
 
 		default:
 			stn = "User Defined"; break;
