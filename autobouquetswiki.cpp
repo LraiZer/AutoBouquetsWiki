@@ -358,7 +358,7 @@ int si_parse_nit(unsigned char *data, int length) {
 				Transport.symbol_rate += (data[offset2 + 10] & 0xf) * 1000;
 				Transport.symbol_rate += (data[offset2 + 11] >> 4) * 100;
 				Transport.symbol_rate += (data[offset2 + 11] & 0xf) * 10;
-				Transport.symbol_rate += data[offset2 + 11] >> 4;
+				Transport.symbol_rate += data[offset2 + 12] >> 4;
 				
 				Transport.fec_inner = data[offset2 + 12] & 0xf;
 
