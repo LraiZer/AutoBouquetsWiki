@@ -960,6 +960,10 @@ string get_fec(short modulation_system, short modulation_type, short fec_inner) 
 			case 3: fec = "3/4"; break;
 			case 4: fec = "5/6"; break;
 			case 5: fec = "7/8"; break;
+			case 6: fec = "8/9"; break;
+			case 7: fec = "3/5"; break;
+			case 8: fec = "4/5"; break;
+			case 9: fec = "9/10"; break;
 			default:
 				fec = "0/0"; break;
 		}
