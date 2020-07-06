@@ -358,7 +358,7 @@ int si_parse_nit(unsigned char *data, int length) {
 				Transport.symbol_rate += (data[offset2 + 10] & 0xf) * 1000;
 				Transport.symbol_rate += (data[offset2 + 11] >> 4) * 100;
 				Transport.symbol_rate += (data[offset2 + 11] & 0xf) * 10;
-				Transport.symbol_rate += data[offset2 + 11] >> 4;
+				Transport.symbol_rate += data[offset2 + 12] >> 4;
 				
 				Transport.fec_inner = data[offset2 + 12] & 0xf;
 
@@ -929,6 +929,7 @@ string get_typename(short st) {
 		case 0x87: stn = "HD TV OnDemand"; break;
 		case 0x85: stn = "SD TV RedButton"; break;
 		case 0x82: stn = "DATA RedButton"; break;
+		case 0x89: stn = "HD TV RedButton"; break;
 
 		default:
 			stn = "User Defined"; break;
@@ -960,6 +961,10 @@ string get_fec(short modulation_system, short modulation_type, short fec_inner) 
 			case 3: fec = "3/4"; break;
 			case 4: fec = "5/6"; break;
 			case 5: fec = "7/8"; break;
+			case 6: fec = "8/9"; break;
+			case 7: fec = "3/5"; break;
+			case 8: fec = "4/5"; break;
+			case 9: fec = "9/10"; break;
 			default:
 				fec = "0/0"; break;
 		}
