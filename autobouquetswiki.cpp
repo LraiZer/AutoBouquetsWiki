@@ -937,6 +937,56 @@ string get_typename(short st) {
 	return stn;
 }
 
+void initRegionDescBSkyB() {
+	REGION_DESCRIPTION[0x01] = "London (Crystal Palace)";
+	REGION_DESCRIPTION[0x02] = "Anglia South (Sudbury)";
+	REGION_DESCRIPTION[0x03] = "Central West (Sutton Coldfield)";
+	REGION_DESCRIPTION[0x04] = "Westcountry West (Mendip)";
+	REGION_DESCRIPTION[0x05] = "Meridian South (Rowridge)";
+	REGION_DESCRIPTION[0x06] = "Westcountry South West";
+	REGION_DESCRIPTION[0x07] = "Granada (Winter Hill)";
+	REGION_DESCRIPTION[0x08] = "Yorkshire West (Emley Moor)";
+	REGION_DESCRIPTION[0x09] = "Meridian Thames Valley (Hannington)";
+	REGION_DESCRIPTION[0x0a] = "Meridian South East (Heathfield)";
+	REGION_DESCRIPTION[0x0b] = "Meridian South (Dover)";
+	REGION_DESCRIPTION[0x0c] = "Border England (Caldbeck)";
+	REGION_DESCRIPTION[0x0d] = "Tyne Tees (Pontop PikeChatton)";
+	REGION_DESCRIPTION[0x12] = "Crystal Palace+Sudbury";
+	REGION_DESCRIPTION[0x13] = "Sutton Coldfield+Waltham+Nottingham";
+	REGION_DESCRIPTION[0x14] = "Central East (Waltham+Nottingham)";
+	REGION_DESCRIPTION[0x15] = "Anglia East (Tacolneston)";
+	REGION_DESCRIPTION[0x18] = "Gloucestershire (Ridge Hill+Mendip)";
+	REGION_DESCRIPTION[0x19] = "Anglia West (Sandy Heath)";
+	REGION_DESCRIPTION[0x1a] = "Emley Moor+Bilsdale";
+	REGION_DESCRIPTION[0x1b] = "Oxford+Sandy Heath";
+	REGION_DESCRIPTION[0x1c] = "Winter Hill+Caldbeck";
+	REGION_DESCRIPTION[0x1d] = "Yorkshire East (Belmont)";
+	REGION_DESCRIPTION[0x20] = "Wales";
+	REGION_DESCRIPTION[0x21] = "Northern Ireland";
+	REGION_DESCRIPTION[0x22] = "Channel Islands (Fremont Point)";
+	REGION_DESCRIPTION[0x23] = "Grampian";
+	REGION_DESCRIPTION[0x24] = "Border Scotland (Caldbeck Scot+Selkirk)";
+	REGION_DESCRIPTION[0x25] = "Scottish West";
+	REGION_DESCRIPTION[0x26] = "Scottish East";
+	REGION_DESCRIPTION[0x27] = "Dundee (Angus)";
+	REGION_DESCRIPTION[0x29] = "Herefordshire (Ridge Hill)";
+	REGION_DESCRIPTION[0x2b] = "Old Wales";
+	REGION_DESCRIPTION[0x2d] = "Merseyside (Winter Hill+Moel-Y-Parc)";
+	REGION_DESCRIPTION[0x32] = "Ireland";
+	REGION_DESCRIPTION[0x3c] = "Waltham+Nottingham+Emley Moor";
+	REGION_DESCRIPTION[0x3d] = "Scarborough (Oliver&#39;s Mount)";
+	REGION_DESCRIPTION[0x3e] = "Belmont+Waltham+Nottingham";
+	REGION_DESCRIPTION[0x3f] = "Oxford+Mendip";
+	REGION_DESCRIPTION[0x40] = "Bluebell Hill+Tunbridge Wells";
+	REGION_DESCRIPTION[0x41] = "Whitehawk Hill";
+	REGION_DESCRIPTION[0x42] = "Midhurst+Hannington";
+	REGION_DESCRIPTION[0x43] = "Rowridge+Westcountry South West";
+	REGION_DESCRIPTION[0x44] = "Midhurst";
+	REGION_DESCRIPTION[0x45] = "Bilsdale";
+	REGION_DESCRIPTION[0x46] = "Oxford+Hannington";
+	REGION_DESCRIPTION[0x47] = "Oxford";
+	REGION_DESCRIPTION[0x48] = "Belmont+Emley Moor";
+}
 short get_rolloff(short roll_off) {
 	short rolloff;
 	switch(roll_off)
@@ -1104,6 +1154,10 @@ int main (int argc, char *argv[]) {
 			return 1;
 		}
 	}
+
+
+	if (!freesat)
+		initRegionDescBSkyB();
 
 	if (freesat)
 	{
@@ -1327,10 +1381,7 @@ int main (int argc, char *argv[]) {
 
 							cout << "\"" << SDT[(*ii).first].name << "\"," ;
 							cout << "\"" << BAT_DESCRIPTION[i];
-
-							if (freesat)
-								cout << ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? ("\",\"" + REGION_DESCRIPTION[a]) : "");
-
+							cout << ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? ("\",\"" + REGION_DESCRIPTION[a]) : "");
 							cout << "\"" ;
 							cout << endl;
 						}
@@ -1709,21 +1760,18 @@ int main (int argc, char *argv[]) {
 						// write header on first open only
 						if (area_region_file_open == false)
 						{
-							string region_description = "";
-
-							if (freesat)
-								region_description = ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? (" - " + REGION_DESCRIPTION[a]) : "");
+							string region_description = ((REGION_DESCRIPTION.find(a) != REGION_DESCRIPTION.end()) ? (" - " + REGION_DESCRIPTION[a]) : "");
 
 							dat_area_region.open (f, ofstream::out);
 
 							dat_index	<< HTML_TITLE_NEW << HTML_TITLE_TILDE << HTML_TITLE_BOUQUET << "0x" << hex << i
 									<< HTML_TITLE_TILDE << HTML_TITLE_REGION << "0x" << hex << a
-									<< HTML_TITLE_TILDE << HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END_TD_NEW;
+									<< HTML_TITLE_TILDE << HTML_TITLES << region_description << HTML_TITLE_END_TD_NEW;
 
 							dat_index 	<< HTML_HREF_NEW << dec << i << "-" << dec << a << ".html\">"
 									<< HTML_TITLE_BOUQUET << dec << i << " - "
 									<< HTML_TITLE_REGION << dec << a
-									<< HTML_REF_END_TD_NEW	<< HTML_TITLES << (freesat ? region_description : "") << HTML_TITLE_END << endl;
+									<< HTML_REF_END_TD_NEW	<< HTML_TITLES << region_description << HTML_TITLE_END << endl;
 
 							dat_area_region << HTML_HEADER1 << HTML_TITLE_BOUQUET << dec << i << " - "
 									<< HTML_TITLE_REGION << dec << a << " - "
