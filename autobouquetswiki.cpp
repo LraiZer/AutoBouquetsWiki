@@ -1752,7 +1752,7 @@ int main (int argc, char *argv[]) {
 						 dat_area << HTML_TD_END_NEW	<< SDT[(*ii).first].category;
 						dat_area << HTML_TITLE_END	<< endl;
 
-						char f[DATA_SIZE]; memset(f, '\0', DATA_SIZE);
+						char f[DATA_SIZE+3]; memset(f, '\0', DATA_SIZE+3);
 						sprintf(f, "%s/%i-%i.html", dest_path, i, a);
 						ofstream dat_area_region;
 
@@ -1824,7 +1824,7 @@ int main (int argc, char *argv[]) {
 			BAT[i][a].clear();
 			if (area_region_file_open)
 			{
-				char f[DATA_SIZE]; memset(f, '\0', DATA_SIZE);
+				char f[DATA_SIZE+3]; memset(f, '\0', DATA_SIZE+3);
 				sprintf(f, "%s/%i-%i.html", dest_path, i, a);
 				ofstream dat_area_region (f, ofstream::app);
 				dat_area_region << HTML_FOOTER;
