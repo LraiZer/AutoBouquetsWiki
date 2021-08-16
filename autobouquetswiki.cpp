@@ -99,10 +99,9 @@ u_int32_t crc_table[256] = {
 	0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4};
 
 u_int32_t crc32 (const char *d, int len, u_int32_t crc) {
-	register int i;
 	const unsigned char *u=(unsigned char*)d;
 
-	for (i=0; i<len; i++)
+	for (int i=0; i<len; i++)
 		crc = (crc << 8) ^ crc_table[((crc >> 24) ^ *u++)];
 
 	return crc;
