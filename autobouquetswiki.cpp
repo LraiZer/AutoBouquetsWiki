@@ -1604,7 +1604,7 @@ int main (int argc, char *argv[]) {
 					chicon_name.c_str(),
 					p_pch.c_str(),
 					d_pch.c_str());
-					system(pcmd);
+					int pch = system(pcmd);(void)pch;
 #if 0
 					int pch = system(pcmd);
 
