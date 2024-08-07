@@ -1064,7 +1064,7 @@ void show_usage(string name) {
 void show_version() {
 	cerr << endl << "AutoBouquetsWiki - 28.2e dvb stream database scanner tool" << endl
 	<< __TIMESTAMP__ << endl
-	<< "Forum - http://www.ukcvs.net" << endl
+	<< "github.com/LraiZer/AutoBouquetsWiki" << endl
 	<< "(c) 2017 LraiZer" << endl << endl
 	<< "For help type 'autobouquetswiki --help'" << endl
 	<< endl;
@@ -1447,7 +1447,7 @@ int main (int argc, char *argv[]) {
 
 	string HTML_FOOTER =	"</table>\n"
 				"<p><button onclick=\"goBack()\">Go Back</button><br><a href=\"#top\">Back to Top</a></p>\n"
-				"<a href=\"http://www.ukcvs.net\" target=\"_blank\" title=\"www.ukcvs.net\">www.ukcvs.net</a>\n"
+				"<a href=\"https://github.com/LraiZer/AutoBouquetsWiki\" target=\"_blank\" title=\"github.com\">Home Page</a>\n"
 				"</center>\n"
 				"</div>\n"
 				"</body>\n"
@@ -1849,7 +1849,7 @@ int main (int argc, char *argv[]) {
 	st_js << sorttable_js;
 	st_js.close();
 
-	cout << endl << "www.ukcvs.net thank you for using AutoBouqeutsWiki " << __DATE__ << ", have fun!" << endl << endl; 
+	cout << endl << "Thank you for using AutoBouqeutsWiki " << __DATE__ << ", have fun!" << endl << endl; 
 
 	return 0;
 }
